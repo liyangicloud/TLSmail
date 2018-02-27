@@ -1,3 +1,6 @@
+# folder
+/Debug/
+
 # Prerequisites
 *.d
 
@@ -15,6 +18,7 @@
 *.so
 *.dylib
 *.dll
+*.lib
 
 # Fortran module files
 *.mod
@@ -29,3 +33,6 @@
 *.exe
 *.out
 *.app
+
+# some file
+mailTest.cpp
