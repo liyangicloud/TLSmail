@@ -1,4 +1,4 @@
-////////////////////////////////////////////////////////////////////////////////
+﻿////////////////////////////////////////////////////////////////////////////////
 // IMAP Class
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -27,6 +27,8 @@ Imap_Command_Entry Imap_command_list[] =
 	{command_STARTTLS_IMAP,      5*60,  5*60,  "A02", "A02", 0, ECImap::COMMAND_EHLO_STARTTLS},
 	{command_LOGIN,              5*60,  5*60,  "A03", "A03", 0, ECImap::COMMAND_AUTH_LOGIN},
 	{command_SELECT,             5*60,  5*60,  "A04", "A04", 0, ECImap::COMMAND_SELECT},
+	{command_IMAP_SEARCH,       5*60,  5*60,  "A07", "A07", 0, ECImap::COMMAND_SELECT},
+    {command_IMAP_FETCH,        5*60,  5*60,  "A08", "A08", 0, ECImap::COMMAND_SELECT },
 	{command_APPEND,             5*60,  5*60,  "A05", "+", 0, ECImap::COMMAND_APPEND},
 	{command_APPEND_DONE,        5*60,  5*60,  "A05", "A05", 0, ECImap::COMMAND_APPEND},
 	{command_LOGOUT,			 5*60,  5*60,  "A06", "A06", 0, ECImap::COMMAND_LOGOUT}
@@ -204,6 +206,7 @@ CImap::CImap()
 
 	m_sCharSet = "ISO-8859-15";
 	m_sCharEncoding = "8bit";
+	m_sMailSubjectKey = "XB234frs-config";
 
 	std::transform(m_sCharSet.begin(), m_sCharSet.end(), m_sCharSet.begin(), ::toupper);
 
@@ -413,6 +416,17 @@ void CImap::SaveMessage()
 		SendData(pEntry);
 		ReceiveResponse(pEntry);
 		
+
+		// ***** search mail to get the mail's uid *****
+
+		pEntry = Imap_FindCommandEntry(command_IMAP_SEARCH);
+		sprintf_s(SendBuf, BUFFER_SIZE, "%s SEARCH HEADER SUBJECT %s\r\n", pEntry->Token, m_sMailSubjectKey.c_str());
+		SendData(pEntry);
+		ReceiveResponse(pEntry);
+
+		 
+
+
 		// ***** APPEND E-MAIL *****
 		
 		pEntry = Imap_FindCommandEntry(command_APPEND);
@@ -850,7 +864,6 @@ bool CImap::ConnectRemoteServer(const char* szServer, const unsigned short nPort
 			closesocket(hSocket);
 			throw ECImap(ECImap::WSA_IOCTLSOCKET);
 		}
-
 		if(connect(hSocket, (LPSOCKADDR)&sockAddr, sizeof(sockAddr)) == SOCKET_ERROR)
 		{
 			if(WSAGetLastError() != WSAEWOULDBLOCK)
@@ -936,7 +949,7 @@ bool CImap::ConnectRemoteServer(const char* szServer, const unsigned short nPort
 	}
 	catch(const ECImap&)
 	{
-		DisconnectRemoteServer();
+			DisconnectRemoteServer();
 		throw;
 		return false;
 	}
@@ -1374,6 +1387,8 @@ void CImap::ReceiveData(Imap_Command_Entry* pEntry)
 	{
 		throw ECImap(ECImap::CONNECTION_CLOSED);
 	}
+	std::cout << RecvBuf << "ReceiveData: ♀♀♀♀♀♀♀♀♀♀♀♀♀♀♀♀♀♀♀♀\n";
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1406,7 +1421,6 @@ void CImap::SendData(Imap_Command_Entry* pEntry)
 	if(SendBuf == NULL)
 		throw ECImap(ECImap::SENDBUF_IS_EMPTY);
 
-	std::cout << "C: " << SendBuf;
 
 	while(nLeft > 0)
 	{
@@ -1441,6 +1455,8 @@ void CImap::SendData(Imap_Command_Entry* pEntry)
 			idx += res;
 		}
 	}
+
+	std::cout << SendBuf << "SendData: ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑\n";
 
 	FD_CLR(hSocket, &fdwrite);
 }
@@ -1780,6 +1796,10 @@ void CImap::SetPassword(const char *Password)
 {
 	m_sPassword = Password;
 }
+void CImap::SetMailSubjectKey(const char *szKeyWords)
+{
+	m_sMailSubjectKey = szKeyWords;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //        NAME: SetSMTPServer
@@ -1965,6 +1985,8 @@ void CImap::ReceiveData_SSL(SSL* ssl, Imap_Command_Entry* pEntry)
 	{
 		throw ECImap(ECImap::CONNECTION_CLOSED);
 	}
+	std::cout << RecvBuf << "ReceiveData_SSL: ♂♂♂♂♂♂♂♂♂♂♂♂♂♂♂♂♂\n";
+
 }
 
 void CImap::ReceiveResponse(Imap_Command_Entry* pEntry)
@@ -1979,8 +2001,6 @@ void CImap::ReceiveResponse(Imap_Command_Entry* pEntry)
 		line.append(RecvBuf);
 		size_t len = line.length();
 		size_t offset = 0;
-
-		std::cout << RecvBuf;
 
 		std::string::size_type bErrorFound = line.rfind("Error:");
 
@@ -2124,6 +2144,8 @@ void CImap::SendData_SSL(SSL* ssl, Imap_Command_Entry* pEntry)
 
 		}
 	}
+
+	std::cout << SendBuf << "SendData_SSL:∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧\n";
 
 	FD_ZERO(&fdwrite);
 	FD_ZERO(&fdread);

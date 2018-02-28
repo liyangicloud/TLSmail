@@ -163,6 +163,8 @@ enum IMAP_COMMAND
 	command_CAPABILITY,
 	command_LOGIN,
 	command_SELECT,
+	command_IMAP_SEARCH,
+	command_IMAP_FETCH,
 	command_APPEND,
 	command_APPEND_DONE,
 	command_LOGOUT
@@ -225,6 +227,7 @@ public:
 	void SetXMailer(const char*);
 	void SetLogin(const char*);
 	void SetPassword(const char*);
+	void SetMailSubjectKey(const char*);
 	void SetXPriority(CImapXPriority);
 	void SetIMAPServer(const char* server, const unsigned short port=0, bool authenticate=true);
 
@@ -236,6 +239,7 @@ public:
 	std::string SentFolder;
 
 private:	
+	std::string m_sMailSubjectKey;
 	std::string m_sLocalHostName;
 	std::string m_sMailFrom;
 	std::string m_sNameFrom;
