@@ -22,16 +22,17 @@
 
 Imap_Command_Entry Imap_command_list[] = 
 {
-	{command_INIT_IMAP,          0,     5*60,  NULL,  NULL,	 1, ECImap::SERVER_NOT_RESPONDING},
-	{command_CAPABILITY,		 5*60,  5*60,  "A01", "A01", 0, ECImap::COMMAND_COMPATIBILITY},
-	{command_STARTTLS_IMAP,      5*60,  5*60,  "A02", "A02", 0, ECImap::COMMAND_EHLO_STARTTLS},
-	{command_LOGIN,              5*60,  5*60,  "A03", "A03", 0, ECImap::COMMAND_AUTH_LOGIN},
-	{command_SELECT,             5*60,  5*60,  "A04", "A04", 0, ECImap::COMMAND_SELECT},
-	{command_IMAP_SEARCH,       5*60,  5*60,  "A07", "A07", 0, ECImap::COMMAND_SELECT},
-    {command_IMAP_FETCH,        5*60,  5*60,  "A08", "A08", 0, ECImap::COMMAND_SELECT },
-	{command_APPEND,             5*60,  5*60,  "A05", "+", 0, ECImap::COMMAND_APPEND},
-	{command_APPEND_DONE,        5*60,  5*60,  "A05", "A05", 0, ECImap::COMMAND_APPEND},
-	{command_LOGOUT,			 5*60,  5*60,  "A06", "A06", 0, ECImap::COMMAND_LOGOUT}
+	{ command_INIT_IMAP,          0,       5 * 60,  NULL,  NULL,  1, ECImap::SERVER_NOT_RESPONDING },
+	{ command_CAPABILITY,		  5 * 60,  5 * 60,  "A01", "A01", 0, ECImap::COMMAND_COMPATIBILITY },
+	{ command_STARTTLS_IMAP,      5 * 60,  5 * 60,  "A02", "A02", 0, ECImap::COMMAND_EHLO_STARTTLS },
+	{ command_LOGIN,              5 * 60,  5 * 60,  "A03", "A03", 0, ECImap::COMMAND_AUTH_LOGIN },
+	{ command_SELECT,             5 * 60,  5 * 60,  "A04", "A04", 0, ECImap::COMMAND_SELECT },
+	{ command_IMAP_SEARCH,        5 * 60,  5 * 60,  "A07", "A07", 0, ECImap::COMMAND_SELECT },
+    { command_IMAP_FETCH,         5 * 60,  5 * 60,  "A08", "A08", 0, ECImap::COMMAND_SELECT },
+	{ command_IMAP_CLOSE,         5 * 60,  5 * 60,  "A09", "A09", 0, ECImap::COMMAND_SELECT },
+	{ command_APPEND,             5 * 60,  5 * 60,  "A05", "+",   0, ECImap::COMMAND_APPEND },
+	{ command_APPEND_DONE,        5 * 60,  5 * 60,  "A05", "A05", 0, ECImap::COMMAND_APPEND },
+	{ command_LOGOUT,			  5 * 60,  5 * 60,  "A06", "A06", 0, ECImap::COMMAND_LOGOUT }
 };
 
 Imap_Content_Type Imap_content_list[] = 
@@ -417,12 +418,47 @@ void CImap::SaveMessage()
 		ReceiveResponse(pEntry);
 		
 
-		// ***** search mail to get the mail's uid *****
+		// ***** search mail to get the mail's num *****
 
 		pEntry = Imap_FindCommandEntry(command_IMAP_SEARCH);
 		sprintf_s(SendBuf, BUFFER_SIZE, "%s SEARCH HEADER SUBJECT %s\r\n", pEntry->Token, m_sMailSubjectKey.c_str());
 		SendData(pEntry);
 		ReceiveResponse(pEntry);
+
+		std::string strTT = RecvBuf;
+		int iMailNum;
+		if (GetMailNumFromString(strTT.c_str(),1,&iMailNum)){
+			//if get mail num
+			//get the mail's complete subject
+			pEntry = Imap_FindCommandEntry(command_IMAP_FETCH);
+			sprintf_s(SendBuf, BUFFER_SIZE, "%s FETCH %d BODY[header.fields (subject)]\r\n", pEntry->Token, iMailNum);
+			SendData(pEntry);
+			ReceiveResponse(pEntry);
+			//subject is in the recvbuffer's line subject
+
+			//get the mail's text,the recvbuffer is in code base64,so you must decode it
+			pEntry = Imap_FindCommandEntry(command_IMAP_FETCH);
+			sprintf_s(SendBuf, BUFFER_SIZE, "%s FETCH %d BODY[1]<0.4096>\r\n", pEntry->Token, iMailNum);
+			//sprintf_s(SendBuf, BUFFER_SIZE, "%s FETCH %d BODY[2.2]\r\n", pEntry->Token, iMailNum);
+			SendData(pEntry);
+			ReceiveResponse(pEntry);
+			std::string szMailText = GetMailTextFromBuffer();
+ 			std::cout << szMailText << "\n";
+
+			//get the mail's attachment
+			pEntry = Imap_FindCommandEntry(command_IMAP_FETCH);
+			sprintf_s(SendBuf, BUFFER_SIZE, "%s FETCH %d BODY\r\n", pEntry->Token, iMailNum);
+			SendData(pEntry);
+			ReceiveResponse(pEntry);
+
+
+
+
+		}else {//if do not get mail num,(1)
+			
+
+		}
+		
 
 		 
 
@@ -1844,6 +1880,37 @@ void CImap::StartTls()
 	ReceiveResponse(pEntry);
 
 	OpenSSLConnect();
+}
+bool CImap::GetMailNumFromString(const char * szSearchString, int iPos, int *piRetmailnum)
+{	
+	*piRetmailnum = 6;
+	return true;
+	return false;
+}
+
+std::string CImap::GetMailTextFromBuffer()
+{
+	std::string szRet = RecvBuf;
+	size_t iBegin, iEnd;
+
+	iBegin = szRet.find('\n');
+
+	iEnd = szRet.rfind('=');
+
+	if (iBegin >= iEnd)
+	{
+		return NULL;
+	}
+	szRet = szRet.substr(iBegin + 1, iEnd - iBegin + 1);
+
+	size_t pos = 0;
+	while ((pos = szRet.find("\r\n")) != szRet.npos)
+	{
+		szRet.erase(pos, 2);
+	}
+	szRet = base64_decode(szRet);
+	
+	return szRet;
 }
 
 void CImap::ReceiveData_SSL(SSL* ssl, Imap_Command_Entry* pEntry)

@@ -95,3 +95,22 @@ std::string base64_decode(std::string const& encoded_string)
 
 	return ret;
 }
+/******************
+
+
+
+**********************/
+int base64_decode_attachment(
+	unsigned char const* szInput,
+	int ilenOfInput,
+	unsigned char * pucBuffer,
+	int ilenOfBuffer)
+{
+
+
+
+
+
+
+	return -1;
+}

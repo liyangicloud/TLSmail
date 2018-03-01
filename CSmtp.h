@@ -30,8 +30,8 @@
 #define COUNTER_VALUE		100		// How many times program will try to receive data
 #define SMTP_BYTE_SIZE_FILE 54
 
-const char SMTP_BOUNDARY_ALTERNATIVE[] = "------------030003070305060005000805";
-const char SMTP_BOUNDARY_MIXED[] = "------------000406070805010304010807";
+const char SMTP_BOUNDARY_ALTERNATIVE[] = "---c2a74f97-1d93-425f-ba7e-05587a2c4b57----";
+const char SMTP_BOUNDARY_MIXED[] = "---c2a74f97-1d93-425f-ba7e-05587a2c4b57------";
 
 enum CSmptXPriority
 {

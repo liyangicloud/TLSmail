@@ -29,8 +29,8 @@
 #define MSG_SIZE_IN_MB		10
 #define IMAP_BYTE_SIZE_FILE 54
 
-const char IMAP_BOUNDARY_ALTERNATIVE[] = "------------030003070305060005000805";
-const char IMAP_BOUNDARY_MIXED[] = "------------000406070805010304010807";
+const char IMAP_BOUNDARY_ALTERNATIVE[] = "-----c2a74f97-1d93-425f-ba7e-05587a2c4b57-------";
+const char IMAP_BOUNDARY_MIXED[] = "----c2a74f97-1d93-425f-ba7e-05587a2c4b57------";
 
 enum CImapXPriority
 {
@@ -165,6 +165,7 @@ enum IMAP_COMMAND
 	command_SELECT,
 	command_IMAP_SEARCH,
 	command_IMAP_FETCH,
+	command_IMAP_CLOSE,
 	command_APPEND,
 	command_APPEND_DONE,
 	command_LOGOUT
@@ -305,6 +306,12 @@ private:
 	void ReceiveData_SSL(SSL* ssl, Imap_Command_Entry* pEntry);
 	void SendData_SSL(SSL* ssl, Imap_Command_Entry* pEntry);
 	void StartTls();
+	/*the string like this:this func can get 2 or 3 or 4 according to iPos param
+	* SEARCH 2 3 4
+    A07 OK SEARCH completed.*/
+	bool GetMailNumFromString(const char * szSearchString,int iPos,int *piRetmailnum);
+public:
+	std::string GetMailTextFromBuffer();
 };
 
 #endif // __CIMAP_H__
