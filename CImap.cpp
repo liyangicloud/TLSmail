@@ -30,6 +30,8 @@ Imap_Command_Entry Imap_command_list[] =
 	{ command_IMAP_SEARCH,        5 * 60,  5 * 60,  "A07", "A07", 0, ECImap::COMMAND_SELECT },
     { command_IMAP_FETCH,         5 * 60,  5 * 60,  "A08", "A08", 0, ECImap::COMMAND_SELECT },
 	{ command_IMAP_CLOSE,         5 * 60,  5 * 60,  "A09", "A09", 0, ECImap::COMMAND_SELECT },
+	{ command_IMAP_LIST,          5 * 60,  5 * 60,  "A10", "A10", 0, ECImap::COMMAND_SELECT },
+	{ command_IMAP_GETATTACH,     5 * 60,  5 * 60,  "A.21", "A.21", 0, ECImap::COMMAND_SELECT },
 	{ command_APPEND,             5 * 60,  5 * 60,  "A05", "+",   0, ECImap::COMMAND_APPEND },
 	{ command_APPEND_DONE,        5 * 60,  5 * 60,  "A05", "A05", 0, ECImap::COMMAND_APPEND },
 	{ command_LOGOUT,			  5 * 60,  5 * 60,  "A06", "A06", 0, ECImap::COMMAND_LOGOUT }
@@ -412,11 +414,19 @@ void CImap::SaveMessage()
 	{
 		// ***** VERIFY SENT FOLDER *****
 
-		Imap_Command_Entry* pEntry = Imap_FindCommandEntry(command_SELECT);
+		Imap_Command_Entry* pEntry;//
+//		pEntry  = Imap_FindCommandEntry(command_IMAP_LIST);
+// 		sprintf_s(SendBuf, BUFFER_SIZE, "%s LIST \"\" \"\\haschild\"\r\n", pEntry->Token);
+// 		SendData(pEntry);
+// 		ReceiveResponse(pEntry);
+		
+		// ***** VERIFY SENT FOLDER *****
+
+		pEntry = Imap_FindCommandEntry(command_SELECT);
 		sprintf_s(SendBuf, BUFFER_SIZE, "%s SELECT \"%s\"\r\n", pEntry->Token, SentFolder.c_str());
 		SendData(pEntry);
 		ReceiveResponse(pEntry);
-		
+
 
 		// ***** search mail to get the mail's num *****
 
@@ -430,11 +440,22 @@ void CImap::SaveMessage()
 		if (GetMailNumFromString(strTT.c_str(),1,&iMailNum)){
 			//if get mail num
 			//get the mail's complete subject
+			//subject is in the recvbuffer's line subject
 			pEntry = Imap_FindCommandEntry(command_IMAP_FETCH);
 			sprintf_s(SendBuf, BUFFER_SIZE, "%s FETCH %d BODY[header.fields (subject)]\r\n", pEntry->Token, iMailNum);
 			SendData(pEntry);
 			ReceiveResponse(pEntry);
-			//subject is in the recvbuffer's line subject
+			
+			//get mail's body info
+			//through this info ,we can get all the attachments.
+			pEntry = Imap_FindCommandEntry(command_IMAP_FETCH);
+			sprintf_s(SendBuf, BUFFER_SIZE, "%s FETCH %d BODY\r\n", pEntry->Token, iMailNum);
+			SendData(pEntry);
+			ReceiveResponse(pEntry);
+			if (DownloadAllAttachsIntoFolder(RecvBuf,m_strDownloadFolder.c_str(),iMailNum))
+			{//
+			}
+
 
 			//get the mail's text,the recvbuffer is in code base64,so you must decode it
 			pEntry = Imap_FindCommandEntry(command_IMAP_FETCH);
@@ -444,6 +465,8 @@ void CImap::SaveMessage()
 			ReceiveResponse(pEntry);
 			std::string szMailText = GetMailTextFromBuffer();
  			std::cout << szMailText << "\n";
+
+
 
 			//get the mail's attachment
 			pEntry = Imap_FindCommandEntry(command_IMAP_FETCH);
@@ -1883,11 +1906,174 @@ void CImap::StartTls()
 }
 bool CImap::GetMailNumFromString(const char * szSearchString, int iPos, int *piRetmailnum)
 {	
+	char delim = ' ';
 	*piRetmailnum = 6;
-	return true;
+
+	std::string szTT = szSearchString;
+	szTT = szTT.substr(9, szTT.find('\r')-9);
+	szTT += " ";
+
+	size_t last = 0;
+	size_t index = szTT.find_first_of(delim,last);
+	int iNow = 1;
+	while (index != std::string::npos)
+	{
+		if (iNow == iPos)
+		{
+			*piRetmailnum = atoi((szTT.substr(last, index - last).c_str()));
+			return true;
+		}
+		iNow++;
+		*piRetmailnum = atoi((szTT.substr(last, index - last).c_str()));
+		last = index + 1;
+		index = szTT.find_first_of(delim, last);
+	}
 	return false;
 }
+/************************************************************************/
+/*param szBodyInfo is like this:no line break
+*7 FETCH(BODY
+(
+("text" "plain" ("charset" "UTF-8") NIL NIL "7BIT" 588 21)
+("text" "plain" ("charset" "GB2312" "name" "chs11.txt") NIL NIL "base64" 494 7)
+("text" "plain" ("charset" "UTF-8" "name" "chs12.txt") NIL NIL "base64" 724 10)
+("text" "plain" ("charset" "US-ASCII" "name" "en22.txt") NIL NIL "base64" 1130 15)
+("text" "plain" ("charset" "US-ASCII" "name" "en23.txt") NIL NIL "base64" 1130 15)
+("text" "plain" ("charset" "GB2312" "name" "long33.txt") NIL NIL "base64" 12486 161)
+("text" "plain" ("charset" "GB2312" "name" "morethan44.txt") NIL NIL "base64" 46136 592)
+"mixed")
+)
+//i found that ,all the attachs are key pairs in "name"-"XXXX"
+//so we get the attachs by fetch body[X]
+//and we know all attachs are encode by base64,so decode it
+在类的私有变量Attachments中存储下载下的附件的完整路径
+*/
+/************************************************************************/
+bool CImap::DownloadAllAttachsIntoFolder(const char *szBodyInfo, const char *szFolderPath,int iMailNum)
+{
+	int iFileNum = 0;	
+	const char *delim = "\"name\" ";
 
+	Attachments.clear();
+
+	std::string strBody = szBodyInfo;
+	std::string strFileName;
+	std::string strWholeFileName= szFolderPath;
+
+	size_t last = 0, iFileNameEndIndex;;
+	size_t index = strBody.find(delim, last);
+	
+	int iAttachNum = 0;
+	while (index != std::string::npos)
+	{
+		//find the attachment,so we get the whole name
+		iFileNameEndIndex = strBody.find("\")", index);
+		strFileName = strBody.substr(index+8, iFileNameEndIndex- index - 8);
+		iAttachNum += 1;
+		//获取这个附件，访问："%s FETCH %d BODY[X]<0.4096>\r\n"  x=iAttachNum+1 this section
+
+		Imap_Command_Entry* pEntry;//
+		pEntry  = Imap_FindCommandEntry(command_IMAP_GETATTACH);
+		sprintf_s(SendBuf, BUFFER_SIZE, "%s FETCH %d BODY[%d]\r\n", pEntry->Token, iMailNum,iAttachNum+1);
+		SendData(pEntry);
+
+		ReceiveAttachment(pEntry, (strWholeFileName + strFileName).c_str());
+
+		//success to get file,then storage the filepath
+		Attachments.push_back((strWholeFileName+strFileName).c_str());
+
+		last = index + 6;
+		index = strBody.find(delim, last);
+	}
+
+
+
+	return true;
+}
+/************************************************************************/
+/*                                                                      */
+/************************************************************************/
+void CImap::ReceiveAttachment(Imap_Command_Entry* pEntry, const char *szDestFilePath)
+{
+	std::string line;
+	bool bFinish = false;
+
+	while (!bFinish)
+	{
+		ReceiveData(pEntry);
+
+		line.append(RecvBuf);
+		size_t len = line.length();
+		size_t offset = 0;
+
+		std::string::size_type bErrorFound = line.rfind("Error:");
+
+		if (line.npos != bErrorFound)
+		{
+			line.clear();
+			throw ECImap(pEntry->error);
+		}
+
+		if (offset + 1 < len)
+		{
+			while (offset + 1 < len)
+			{
+				if (line[offset] == '\r' && line[offset + 1] == '\n')
+				{
+					if (!pEntry->bSkipToken)
+					{
+						std::string::size_type bFound = line.rfind(pEntry->TokenRecv);
+
+						if (line.npos != bFound)
+						{
+							bFinish = true;
+							break;
+						}
+					}
+					else
+					{
+						bFinish = true;
+						break;
+					}
+				}
+				++offset;
+			}
+		}
+	}
+
+	// check return string for success
+	if (!pEntry->bSkipToken && pEntry->command != command_APPEND)
+	{
+		std::string szTokenOK;
+
+		szTokenOK.append(pEntry->TokenRecv);
+		szTokenOK.append(" ");
+		szTokenOK.append("OK");
+
+		std::string::size_type bFound = line.find(szTokenOK.c_str());
+
+		if (line.npos == bFound)
+		{
+			line.clear();
+			szTokenOK.clear();
+			throw ECImap(pEntry->error);
+		}
+
+		szTokenOK.clear();
+	}
+
+	//在line变量里面存储着该附件的全部base64编码
+	//接下来必须进行转码，并将转码信息存入文件中
+	//注意解码后的值可能会包含\0这样的值，所以必须特别处理
+
+	strcpy_s(RecvBuf, BUFFER_SIZE, line.c_str());
+	line.clear();
+
+
+}
+/************************************************************************/
+/*                                                                      */
+/************************************************************************/
 std::string CImap::GetMailTextFromBuffer()
 {
 	std::string szRet = RecvBuf;
@@ -1989,7 +2175,8 @@ void CImap::ReceiveData_SSL(SSL* ssl, Imap_Command_Entry* pEntry)
 						throw ECImap(ECImap::LACK_OF_MEMORY);
 					}
 
-					strncpy_s(RecvBuf + offset, BUFFER_SIZE, buff, res);
+					strncpy_s(RecvBuf + offset, BUFFER_SIZE-offset, buff, res);
+					
 					
 					delete[] buff;
 					buff = NULL;
@@ -2043,7 +2230,7 @@ void CImap::ReceiveData_SSL(SSL* ssl, Imap_Command_Entry* pEntry)
 			}
 		}
 	}
-
+	
 	FD_ZERO(&fdread);
 	FD_ZERO(&fdwrite);
 	RecvBuf[offset] = 0;

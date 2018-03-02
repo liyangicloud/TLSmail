@@ -24,10 +24,11 @@
 #include "openssl\ssl.h"
 
 #define TIME_IN_SEC			3 * 60
-#define BUFFER_SIZE			10240
+#define BUFFER_SIZE			(10240*1024)
 #define BUFFER_MSGID_SIZE	200  
 #define MSG_SIZE_IN_MB		10
 #define IMAP_BYTE_SIZE_FILE 54
+#define ATTATCH_BUFFER_SIZE (1024*10240)
 
 const char IMAP_BOUNDARY_ALTERNATIVE[] = "-----c2a74f97-1d93-425f-ba7e-05587a2c4b57-------";
 const char IMAP_BOUNDARY_MIXED[] = "----c2a74f97-1d93-425f-ba7e-05587a2c4b57------";
@@ -166,6 +167,8 @@ enum IMAP_COMMAND
 	command_IMAP_SEARCH,
 	command_IMAP_FETCH,
 	command_IMAP_CLOSE,
+	command_IMAP_LIST,
+	command_IMAP_GETATTACH,
 	command_APPEND,
 	command_APPEND_DONE,
 	command_LOGOUT
@@ -238,6 +241,7 @@ public:
 
 	std::string MsgBodyHTML;
 	std::string SentFolder;
+	std::string m_strDownloadFolder;
 
 private:	
 	std::string m_sMailSubjectKey;
@@ -310,6 +314,8 @@ private:
 	* SEARCH 2 3 4
     A07 OK SEARCH completed.*/
 	bool GetMailNumFromString(const char * szSearchString,int iPos,int *piRetmailnum);
+	bool DownloadAllAttachsIntoFolder(const char *szBodyInfo, const char *szFolderPath, int iMailNum);
+	void ReceiveAttachment(Imap_Command_Entry* pEntry,const char *szDestFilePath);
 public:
 	std::string GetMailTextFromBuffer();
 };
