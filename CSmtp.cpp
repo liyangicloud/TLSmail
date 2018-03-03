@@ -15,6 +15,7 @@
 #include "openssl/md5.h"
 
 #include <cassert>
+#define BUFFER_SIZE			10240	// SendData and RecvData buffers sizes
 
 // OpenSSL 1.0.2h - /MT
 #pragma comment(lib, "ssleay32mt.lib")

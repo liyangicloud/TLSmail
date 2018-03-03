@@ -24,7 +24,6 @@
 #include "openssl\ssl.h"
 
 #define TIME_IN_SEC			3 * 60	// how long client will wait for server response in non-blocking mode
-#define BUFFER_SIZE			10240	// SendData and RecvData buffers sizes
 #define BUFFER_MSGID_SIZE	200		
 #define MSG_SIZE_IN_MB		10		// Maximum size of the message with all attachments
 #define COUNTER_VALUE		100		// How many times program will try to receive data

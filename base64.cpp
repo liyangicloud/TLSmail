@@ -95,22 +95,113 @@ std::string base64_decode(std::string const& encoded_string)
 
 	return ret;
 }
+/**********************************/
+int base64_decode_attach(unsigned char * pcInputBuffer, int iInputLen, unsigned char * pucBuffer)
+{
+	int in_len = static_cast<int>(iInputLen);
+	int i = 0, j = 0, in_ = 0;
+	unsigned char char_array_4[4], char_array_3[3];
+	//	std::string ret;
+	int iDecodeNum = 0;
+
+	while (in_len-- && ((*(pcInputBuffer+ in_)) != '=') && is_base64((*(pcInputBuffer + in_))))
+	{
+		char_array_4[i++] = (*(pcInputBuffer + in_));
+		in_++;
+		if ('\r' == (*(pcInputBuffer + in_))){
+			//如果碰到换行符，则进行跃进操作
+			in_ += 2;
+			in_len -= 2;
+		}
+
+		if (i == 4) {
+			for (i = 0; i < 4; i++)
+				char_array_4[i] = static_cast<unsigned char>(base64_chars.find(char_array_4[i]));
+
+			char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+			char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+			char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
+
+			for (i = 0; (i < 3); i++)
+			{
+				pucBuffer[iDecodeNum] = char_array_3[i];
+				iDecodeNum++;
+			}
+			i = 0;
+		}
+	}
+
+	if (i)
+	{
+		for (j = i; j < 4; j++)
+			char_array_4[j] = 0;
+
+		for (j = 0; j < 4; j++)
+			char_array_4[j] = static_cast<unsigned char>(base64_chars.find(char_array_4[j]));
+
+		char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+		char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+		char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
+
+		for (j = 0; (j < i - 1); j++)
+		{
+			pucBuffer[iDecodeNum] = char_array_3[j];
+			iDecodeNum++;
+		}
+	}
+	return iDecodeNum;
+}
+
 /******************
 
 
 
 **********************/
-int base64_decode_attachment(
-	unsigned char const* szInput,
-	int ilenOfInput,
-	unsigned char * pucBuffer,
-	int ilenOfBuffer)
+int base64_decode_attachment(std::string const& encoded_string, unsigned char * pucBuffer)
 {
+	int in_len = static_cast<int>(encoded_string.size());
+	int i = 0, j = 0, in_ = 0;
+	unsigned char char_array_4[4], char_array_3[3];
+//	std::string ret;
+	int iDecodeNum = 0;
 
+	while (in_len-- && (encoded_string[in_] != '=') && is_base64(encoded_string[in_]))
+	{
+		char_array_4[i++] = encoded_string[in_]; in_++;
+		if (i == 4) {
+			for (i = 0; i < 4; i++)
+				char_array_4[i] = static_cast<unsigned char>(base64_chars.find(char_array_4[i]));
 
+			char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+			char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+			char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
 
+			for (i = 0; (i < 3); i++)
+			{
+				pucBuffer[iDecodeNum] = char_array_3[i];
+				iDecodeNum++;
+			}
+			i = 0;
+		}
+	}
 
+	if (i)
+	{
+		for (j = i; j < 4; j++)
+			char_array_4[j] = 0;
 
+		for (j = 0; j < 4; j++)
+			char_array_4[j] = static_cast<unsigned char>(base64_chars.find(char_array_4[j]));
 
-	return -1;
+		char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+		char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+		char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
+
+		for (j = 0; (j < i - 1); j++)
+		{
+			pucBuffer[iDecodeNum] = char_array_3[j];
+			iDecodeNum++;
+		}
+	}
+	return iDecodeNum;
 }

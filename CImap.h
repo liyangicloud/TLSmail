@@ -24,7 +24,6 @@
 #include "openssl\ssl.h"
 
 #define TIME_IN_SEC			3 * 60
-#define BUFFER_SIZE			(10240*1024)
 #define BUFFER_MSGID_SIZE	200  
 #define MSG_SIZE_IN_MB		10
 #define IMAP_BYTE_SIZE_FILE 54
@@ -147,7 +146,8 @@ public:
 		ERRNO_ENOSYS,
 		ERRNO_ENOTEMPTY,
 		ERRNO_EILSEQ,
-		ERRNO_STRUNCATE = 480
+		ERRNO_STRUNCATE = 480,
+		ERRNO_IMAP_DOWNATTACH_OVERTIME
 	};
 	ECImap(CImapError err_) : ErrorCode(err_) {}
 	CImapError GetErrorNum(void) const {return ErrorCode;}
@@ -241,7 +241,6 @@ public:
 
 	std::string MsgBodyHTML;
 	std::string SentFolder;
-	std::string m_strDownloadFolder;
 
 private:	
 	std::string m_sMailSubjectKey;
@@ -315,7 +314,11 @@ private:
     A07 OK SEARCH completed.*/
 	bool GetMailNumFromString(const char * szSearchString,int iPos,int *piRetmailnum);
 	bool DownloadAllAttachsIntoFolder(const char *szBodyInfo, const char *szFolderPath, int iMailNum);
-	void ReceiveAttachment(Imap_Command_Entry* pEntry,const char *szDestFilePath);
+	void ReceiveAttachment(Imap_Command_Entry* pEntry, const char *szDestFilePath);
+	bool ReceiveAttachment_SSL(const char *szDestFilePath);
+
+	std::string m_szAttachDir;
+	std::string m_szMailText;
 public:
 	std::string GetMailTextFromBuffer();
 };

@@ -19,6 +19,7 @@
 // OpenSSL 1.0.2h - /MT
 #pragma comment(lib, "ssleay32mt.lib")
 #pragma comment(lib, "libeay32mt.lib")
+#define BUFFER_SIZE			10240
 
 Imap_Command_Entry Imap_command_list[] = 
 {
@@ -398,11 +399,7 @@ void CImap::AddMsgLine(const char* Text)
 ////////////////////////////////////////////////////////////////////////////////
 void CImap::SaveMessage()
 {
-	unsigned int i, res, FileId;
-	unsigned long int FileSize, TotalSize, MsgPart;
-
 	// ***** CONNECTING TO IMAP SERVER *****
-
 	// connecting to remote host if not already connected:
 	if(hSocket == INVALID_SOCKET)
 	{
@@ -437,6 +434,9 @@ void CImap::SaveMessage()
 
 		std::string strTT = RecvBuf;
 		int iMailNum;
+		//仅获取第一封邮件，可以扩展操作其他的邮件，使用while循环
+		// Todo:
+
 		if (GetMailNumFromString(strTT.c_str(),1,&iMailNum)){
 			//if get mail num
 			//get the mail's complete subject
@@ -446,16 +446,6 @@ void CImap::SaveMessage()
 			SendData(pEntry);
 			ReceiveResponse(pEntry);
 			
-			//get mail's body info
-			//through this info ,we can get all the attachments.
-			pEntry = Imap_FindCommandEntry(command_IMAP_FETCH);
-			sprintf_s(SendBuf, BUFFER_SIZE, "%s FETCH %d BODY\r\n", pEntry->Token, iMailNum);
-			SendData(pEntry);
-			ReceiveResponse(pEntry);
-			if (DownloadAllAttachsIntoFolder(RecvBuf,m_strDownloadFolder.c_str(),iMailNum))
-			{//
-			}
-
 
 			//get the mail's text,the recvbuffer is in code base64,so you must decode it
 			pEntry = Imap_FindCommandEntry(command_IMAP_FETCH);
@@ -463,387 +453,23 @@ void CImap::SaveMessage()
 			//sprintf_s(SendBuf, BUFFER_SIZE, "%s FETCH %d BODY[2.2]\r\n", pEntry->Token, iMailNum);
 			SendData(pEntry);
 			ReceiveResponse(pEntry);
-			std::string szMailText = GetMailTextFromBuffer();
- 			std::cout << szMailText << "\n";
+			m_szMailText = GetMailTextFromBuffer();
+			//邮件的正文内容获取完毕
+			// Todo:
 
-
-
-			//get the mail's attachment
+			//get mail's body info
+			//through this info ,we can get all the attachments.
 			pEntry = Imap_FindCommandEntry(command_IMAP_FETCH);
 			sprintf_s(SendBuf, BUFFER_SIZE, "%s FETCH %d BODY\r\n", pEntry->Token, iMailNum);
 			SendData(pEntry);
 			ReceiveResponse(pEntry);
+			if (DownloadAllAttachsIntoFolder(RecvBuf, m_szAttachDir.c_str(),iMailNum)){
+				//获取邮件的附件完成
+				// Todo:
 
-
-
-
-		}else {//if do not get mail num,(1)
-			
-
-		}
-		
-
-		 
-
-
-		// ***** APPEND E-MAIL *****
-		
-		pEntry = Imap_FindCommandEntry(command_APPEND);
-		sprintf_s(SendBuf, BUFFER_SIZE, "%s APPEND \"%s\" (\\Seen) {%lld}\r\n", pEntry->Token, SentFolder.c_str(), dwNumChar);
-		SendData(pEntry);
-		ReceiveResponse(pEntry);
-
-		// send header(s)
-		FormatHeader(SendBuf);
-		SendData(pEntry);
-		dwNumCharSent += strlen(SendBuf);
-
-		const char *ResultLine;
-
-		// send text message
-		if(GetMsgLines())
-		{
-			for(i = 0; i < GetMsgLines(); i++)
-			{
-				ResultLine = GetMsgLineText(i);
-				int dwSize = static_cast<int>(strlen(ResultLine));
-				int Offset = 0;
-
-				if(dwSize >= BUFFER_SIZE/2)
-				{
-					int dwIndex = 0;
-
-					while(Offset<(dwSize-1))
-					{
-						strncpy_s(SendBuf, BUFFER_SIZE, ResultLine + Offset, BUFFER_SIZE/2);
-						SendBuf[BUFFER_SIZE/2] = '\0';
-						SendData(pEntry);
-						dwNumCharSent += strlen(SendBuf);
-						Offset += BUFFER_SIZE/2;
-					}
-
-					strcpy_s(SendBuf, BUFFER_SIZE, "\r\n");
-					SendData(pEntry);
-					dwNumCharSent += strlen(SendBuf);
-				}
-				else
-				{
-					sprintf_s(SendBuf, BUFFER_SIZE, "%s\r\n", ResultLine);
-					SendData(pEntry);
-					dwNumCharSent += strlen(SendBuf);
-				}
 			}
 		}
-		else
-		{
-			sprintf_s(SendBuf, BUFFER_SIZE, "%s\r\n", " ");
-			SendData(pEntry);
-			dwNumCharSent += strlen(SendBuf);
-		}
 
-		// send html text
-		if(m_bHTML)
-		{
-			MsgBody.clear();
-			MsgBody.push_back(MsgBodyHTML.c_str());
-
-			sprintf_s(SendBuf, BUFFER_SIZE, "\r\n");
-			strcat_s(SendBuf, BUFFER_SIZE, "--");
-			strcat_s(SendBuf, BUFFER_SIZE, IMAP_BOUNDARY_ALTERNATIVE);
-			strcat_s(SendBuf, BUFFER_SIZE, "\r\n");
-
-			strcat_s(SendBuf, BUFFER_SIZE, "Content-Type: text/html; charset=\"");
-			strcat_s(SendBuf, BUFFER_SIZE, m_sCharSet.c_str());
-			strcat_s(SendBuf, BUFFER_SIZE, "\"\r\n");
-			strcat_s(SendBuf, BUFFER_SIZE, "Content-Transfer-Encoding: ");
-			strcat_s(SendBuf, BUFFER_SIZE, m_sCharEncoding.c_str());
-			strcat_s(SendBuf, BUFFER_SIZE, "\r\n");
-			strcat_s(SendBuf, BUFFER_SIZE, "\r\n");
-
-			SendData(pEntry);
-			dwNumCharSent += strlen(SendBuf);
-
-			if(GetMsgLines())
-			{
-				for(i = 0; i < GetMsgLines(); i++)
-				{
-					ResultLine = GetMsgLineText(i);
-					int dwSize = static_cast<int>(strlen(ResultLine));
-					int Offset = 0;
-
-					if(dwSize >= BUFFER_SIZE/2)
-					{
-						int dwIndex = 0;
-
-						while(Offset<(dwSize-1))
-						{
-							strncpy_s(SendBuf, BUFFER_SIZE, ResultLine+Offset, BUFFER_SIZE/2);
-							SendBuf[BUFFER_SIZE/2] = '\0';
-							SendData(pEntry);
-							dwNumCharSent += strlen(SendBuf);
-							Offset+=BUFFER_SIZE/2;
-						}
-
-						strcpy_s(SendBuf, BUFFER_SIZE, "\r\n");
-						SendData(pEntry);
-						dwNumCharSent += strlen(SendBuf);
-					}
-					else
-					{
-						sprintf_s(SendBuf, BUFFER_SIZE, "%s\r\n", ResultLine);
-						SendData(pEntry);
-						dwNumCharSent += strlen(SendBuf);
-					}
-				}
-			}
-			else
-			{
-				sprintf_s(SendBuf, BUFFER_SIZE, "%s\r\n", " ");
-				SendData(pEntry);
-				dwNumCharSent += strlen(SendBuf);
-			}
-
-			sprintf_s(SendBuf, BUFFER_SIZE, "\r\n");
-			strcat_s(SendBuf, BUFFER_SIZE, "--");
-			strcat_s(SendBuf, BUFFER_SIZE, IMAP_BOUNDARY_ALTERNATIVE);
-			strcat_s(SendBuf, BUFFER_SIZE, "--\r\n");
-
-			SendData(pEntry);
-			dwNumCharSent += strlen(SendBuf);
-		}
-
-		sprintf_s(SendBuf, BUFFER_SIZE, "\r\n");
-		SendData(pEntry);
-		dwNumCharSent += strlen(SendBuf);
-
-		// next goes attachments (if they are)
-		if((FileBuf = new char[55]) == NULL)
-			throw ECImap(ECImap::LACK_OF_MEMORY);
-
-		if((FileName = new char[MAX_PATH]) == NULL)
-			throw ECImap(ECImap::LACK_OF_MEMORY);
-
-		TotalSize = 0;
-
-		for(FileId = 0; FileId < Attachments.size(); FileId++)
-		{
-			strcpy_s(FileName, MAX_PATH, Attachments[FileId].c_str());
-
-			sprintf_s(SendBuf, BUFFER_SIZE, "--%s\r\n", IMAP_BOUNDARY_MIXED);
-
-			char* FileExt = NULL;
-			
-			FileExt = strrchr(&FileName[Attachments[FileId].find_last_of("\\") + 1], '.');
-
-			if(FileExt != NULL)
-			{
-				strcat_s(SendBuf, BUFFER_SIZE, "Content-Type: ");
-				strcat_s(SendBuf, BUFFER_SIZE, Imap_FindContentType(FileExt));
-				strcat_s(SendBuf, BUFFER_SIZE, ";\r\n\tname=");
-			}
-			else
-				strcat_s(SendBuf, BUFFER_SIZE, "Content-Type: application/octet-stream;\r\n\tname=");
-			
-			FileExt = NULL;
-
-			if (strcmp(m_sCharSet.c_str(), "UTF-8") == 0)
-			{
-				std::string szAttNameEncoded;
-
-				strcat_s(SendBuf, BUFFER_SIZE, "\"");
-
-				szAttNameEncoded.append("=?UTF-8?B?");
-				szAttNameEncoded.append(base64_encode(reinterpret_cast<const unsigned char*>(&FileName[Attachments[FileId].find_last_of("\\") + 1]), static_cast<unsigned int>(strlen(&FileName[Attachments[FileId].find_last_of("\\") + 1]))));
-				szAttNameEncoded.append("?=");
-
-				strcat_s(SendBuf, BUFFER_SIZE, szAttNameEncoded.c_str());
-
-				strcat_s(SendBuf, BUFFER_SIZE, "\"");
-
-				szAttNameEncoded.clear();
-			}
-			else
-			{
-				strcat_s(SendBuf, BUFFER_SIZE, "\"");
-				strcat_s(SendBuf, BUFFER_SIZE, &FileName[Attachments[FileId].find_last_of("\\") + 1]);
-				strcat_s(SendBuf, BUFFER_SIZE, "\"");
-			}
-
-			strcat_s(SendBuf, BUFFER_SIZE, "\r\n");
-			strcat_s(SendBuf, BUFFER_SIZE, "Content-Transfer-Encoding: base64\r\n");
-			strcat_s(SendBuf, BUFFER_SIZE, "Content-Disposition: attachment;\r\n\tfilename=");
-
-			if (strcmp(m_sCharSet.c_str(), "UTF-8") == 0)
-			{
-				std::string szAttNameEncoded;
-
-				strcat_s(SendBuf, BUFFER_SIZE, "\"");
-
-				szAttNameEncoded.append("=?UTF-8?B?");
-				szAttNameEncoded.append(base64_encode(reinterpret_cast<const unsigned char*>(&FileName[Attachments[FileId].find_last_of("\\") + 1]), static_cast<unsigned int>(strlen(&FileName[Attachments[FileId].find_last_of("\\") + 1]))));
-				szAttNameEncoded.append("?=");
-
-				strcat_s(SendBuf, BUFFER_SIZE, szAttNameEncoded.c_str());
-
-				strcat_s(SendBuf, BUFFER_SIZE, "\"");
-
-				szAttNameEncoded.clear();
-			}
-			else
-			{
-				strcat_s(SendBuf, BUFFER_SIZE, "\"");
-				strcat_s(SendBuf, BUFFER_SIZE, &FileName[Attachments[FileId].find_last_of("\\") + 1]);
-				strcat_s(SendBuf, BUFFER_SIZE, "\"");
-			}
-
-			strcat_s(SendBuf, BUFFER_SIZE, "\r\n");
-			strcat_s(SendBuf, BUFFER_SIZE, "\r\n");
-
-			SendData(pEntry);
-			dwNumCharSent += strlen(SendBuf);
-
-			errno_t err;
-
-			// opening the file
-			err = fopen_s(&hFile, FileName, "rb");
-			
-			if(err != NULL)
-			{
-				if(err == EPERM)
-					throw ECImap(ECImap::ERRNO_EPERM);
-				else if(err == ENOENT)
-					throw ECImap(ECImap::ERRNO_ENOENT);
-				else if(err == ESRCH)
-					throw ECImap(ECImap::ERRNO_ESRCH);
-				else if(err == EINTR)
-					throw ECImap(ECImap::ERRNO_EINTR);
-				else if(err == EIO)
-					throw ECImap(ECImap::ERRNO_EIO);
-				else if(err == ENXIO)
-					throw ECImap(ECImap::ERRNO_ENXIO);
-				else if(err == E2BIG)
-					throw ECImap(ECImap::ERRNO_E2BIG);
-				else if(err == ENOEXEC)
-					throw ECImap(ECImap::ERRNO_ENOEXEC);
-				else if(err == EBADF)
-					throw ECImap(ECImap::ERRNO_EBADF);
-				else if(err == ECHILD)
-					throw ECImap(ECImap::ERRNO_ECHILD);
-				else if(err == EAGAIN)
-					throw ECImap(ECImap::ERRNO_EAGAIN);
-				else if(err == ENOMEM)
-					throw ECImap(ECImap::ERRNO_ENOMEM);
-				else if(err == EACCES)
-					throw ECImap(ECImap::ERRNO_EACCES);
-				else if(err == EFAULT)
-					throw ECImap(ECImap::ERRNO_EFAULT);
-				else if(err == EBUSY)
-					throw ECImap(ECImap::ERRNO_EBUSY);
-				else if(err == EEXIST)
-					throw ECImap(ECImap::ERRNO_EEXIST);
-				else if(err == EXDEV)
-					throw ECImap(ECImap::ERRNO_EXDEV);
-				else if(err == ENODEV)
-					throw ECImap(ECImap::ERRNO_ENODEV);
-				else if(err == ENOTDIR)
-					throw ECImap(ECImap::ERRNO_ENOTDIR);
-				else if(err == EISDIR)
-					throw ECImap(ECImap::ERRNO_EISDIR);
-				else if(err == EINVAL)
-					throw ECImap(ECImap::ERRNO_EINVAL);
-				else if(err == ENFILE)
-					throw ECImap(ECImap::ERRNO_ENFILE);
-				else if(err == EMFILE)
-					throw ECImap(ECImap::ERRNO_EMFILE);
-				else if(err == ENOTTY)
-					throw ECImap(ECImap::ERRNO_ENOTTY);
-				else if(err == EFBIG)
-					throw ECImap(ECImap::ERRNO_EFBIG);
-				else if(err == ENOSPC)
-					throw ECImap(ECImap::ERRNO_ENOSPC);
-				else if(err == ESPIPE)
-					throw ECImap(ECImap::ERRNO_ESPIPE);
-				else if(err == EROFS)
-					throw ECImap(ECImap::ERRNO_EROFS);
-				else if(err == EMLINK)
-					throw ECImap(ECImap::ERRNO_EMLINK);
-				else if(err == EPIPE)
-					throw ECImap(ECImap::ERRNO_EPIPE);
-				else if(err == EDOM)
-					throw ECImap(ECImap::ERRNO_EDOM);
-				else if(err == ERANGE)
-					throw ECImap(ECImap::ERRNO_ERANGE);
-				else if(err == EDEADLK)
-					throw ECImap(ECImap::ERRNO_EDEADLK);
-				else if(err == ENAMETOOLONG)
-					throw ECImap(ECImap::ERRNO_ENAMETOOLONG);
-				else if(err == ENOLCK)
-					throw ECImap(ECImap::ERRNO_ENOLCK);
-				else if(err == ENOSYS)
-					throw ECImap(ECImap::ERRNO_ENOSYS);
-				else if(err == ENOTEMPTY)
-					throw ECImap(ECImap::ERRNO_ENOTEMPTY);
-				else if(err == EILSEQ)
-					throw ECImap(ECImap::ERRNO_EILSEQ);
-				else if(err == STRUNCATE)
-					throw ECImap(ECImap::ERRNO_STRUNCATE);
-				else
-					throw ECImap(ECImap::FILE_NOT_EXIST);
-			}
-
-			// checking file size
-			FileSize = 0;
-
-			fseek(hFile, 0, SEEK_END);
-			FileSize = ftell(hFile);
-			fseek (hFile, 0, SEEK_SET);
-
-			// sending the file
-			MsgPart = 0;
-				
-			for(i = 0; i < FileSize / IMAP_BYTE_SIZE_FILE+1; i++)
-			{
-				res = static_cast<unsigned int>(fread(FileBuf, sizeof(char), IMAP_BYTE_SIZE_FILE, hFile));
-				MsgPart ? strcat_s(SendBuf, BUFFER_SIZE, base64_encode(reinterpret_cast<const unsigned char*>(FileBuf), res).c_str())
-						  : strcpy_s(SendBuf, BUFFER_SIZE, base64_encode(reinterpret_cast<const unsigned char*>(FileBuf), res).c_str());
-				strcat_s(SendBuf, BUFFER_SIZE, "\r\n");
-				MsgPart += res + 2;
-				if(MsgPart >= (BUFFER_SIZE / 2))
-				{ // sending part of the message
-					MsgPart = 0;
-					SendData(pEntry);
-					dwNumCharSent += strlen(SendBuf);
-				}
-			}
-
-			if(MsgPart)
-			{
-				SendData(pEntry);
-				dwNumCharSent += strlen(SendBuf);
-			}
-
-			fclose(hFile);
-		}
-
-		delete[] FileBuf;
-		delete[] FileName;
-		
-		FileBuf = NULL;
-		FileName =  NULL;
-
-		// sending last message block (if there is one or more attachments)
-		if(Attachments.size())
-		{
-			sprintf_s(SendBuf, BUFFER_SIZE, "\r\n--%s--\r\n", IMAP_BOUNDARY_MIXED);
-			SendData(pEntry);
-			dwNumCharSent += strlen(SendBuf);
-		}
-		
-		strcpy_s(SendBuf, BUFFER_SIZE, "\r\n");
-		SendData(pEntry);
-
-		pEntry = Imap_FindCommandEntry(command_APPEND_DONE);
-		ReceiveResponse(pEntry);
 	}
 	catch(const ECImap&)
 	{
@@ -1877,6 +1503,32 @@ void CImap::SetIMAPServer(const char* SrvName, const unsigned short SrvPort, boo
 	m_iIMAPSrvPort = SrvPort;
 	m_sIMAPSrvName = SrvName;
 	m_bAuthenticate = authenticate;
+
+	std::string szTempPath = "";
+	TCHAR azTCTempPath[MAX_PATH];
+	if (0 != GetTempPath(MAX_PATH, azTCTempPath)) {
+		char azTempPath[MAX_PATH];
+		WideCharToMultiByte(CP_ACP, 0, azTCTempPath, -1, azTempPath, MAX_PATH, NULL, NULL);
+		szTempPath = azTempPath;
+		szTempPath = szTempPath.substr(0, szTempPath.rfind('\\', szTempPath.length() - 2) + 1);
+		szTempPath = szTempPath.substr(4, szTempPath.length() - 6);
+		if (szTempPath.npos != szTempPath.find('\\', 0)) {
+			szTempPath = azTempPath;
+			szTempPath = szTempPath.substr(0, szTempPath.rfind('\\', szTempPath.length() - 2) + 1);
+		}
+		else {
+			szTempPath = azTempPath;
+		}
+		szTempPath += "appleiTunes";
+		MultiByteToWideChar(CP_ACP, 0, szTempPath.c_str(), -1, azTCTempPath, MAX_PATH);
+		DWORD dwFileAttr = GetFileAttributes(azTCTempPath);
+		if ((INVALID_FILE_ATTRIBUTES == dwFileAttr) || (0 == (dwFileAttr&FILE_ATTRIBUTE_DIRECTORY))) {
+			//文件夹不存在，创建这个文件夹
+			CreateDirectory(azTCTempPath, NULL);
+		}
+		szTempPath += "\\";
+	}
+	m_szAttachDir = szTempPath;
 }
 
 void CImap::SayQuit()
@@ -1970,24 +1622,116 @@ bool CImap::DownloadAllAttachsIntoFolder(const char *szBodyInfo, const char *szF
 		iFileNameEndIndex = strBody.find("\")", index);
 		strFileName = strBody.substr(index+8, iFileNameEndIndex- index - 8);
 		iAttachNum += 1;
-		//获取这个附件，访问："%s FETCH %d BODY[X]<0.4096>\r\n"  x=iAttachNum+1 this section
 
+		//获取这个附件，访问："%s FETCH %d BODY[X]<0.819200>\r\n"  x=iAttachNum+1 this section
 		Imap_Command_Entry* pEntry;//
 		pEntry  = Imap_FindCommandEntry(command_IMAP_GETATTACH);
-		sprintf_s(SendBuf, BUFFER_SIZE, "%s FETCH %d BODY[%d]\r\n", pEntry->Token, iMailNum,iAttachNum+1);
+		sprintf_s(SendBuf, BUFFER_SIZE, "%s FETCH %d BODY[%d]<0.6291000>\r\n", pEntry->Token, iMailNum,iAttachNum+1);
 		SendData(pEntry);
 
-		ReceiveAttachment(pEntry, (strWholeFileName + strFileName).c_str());
-
-		//success to get file,then storage the filepath
-		Attachments.push_back((strWholeFileName+strFileName).c_str());
+		if (ReceiveAttachment_SSL((strWholeFileName + strFileName).c_str())){
+			Attachments.push_back((strWholeFileName + strFileName).c_str());
+		}
 
 		last = index + 6;
 		index = strBody.find(delim, last);
 	}
+	
+	return true;
+}
+/************************************************************************/
+/*                                                                      */
+/************************************************************************/
+bool CImap::ReceiveAttachment_SSL(const char *szDestFilePath)
+{
+	int res = 0;
+	int offset = 0;
+	SSL *ssl = m_ssl;
 
+	const int buff_len = 1024*1024*6;
+	char* buff;
 
+	if ((buff = new char[buff_len]) == NULL)
+		throw ECImap(ECImap::LACK_OF_MEMORY);
 
+	bool bFinish = false;
+	char * pchTT;
+
+	DWORD dwCurTick, dwLastTick;
+	int iSleepTimes=0;
+	dwLastTick = GetTickCount();	
+
+	while (!bFinish)
+	{
+		dwCurTick = GetTickCount();
+		if (((dwCurTick >= dwLastTick) ? (dwCurTick - dwLastTick) : dwCurTick) > 10000 ) {
+			//此下载函数执行时间太长，必须释放cpu
+			if (iSleepTimes < 30)
+			{//执行的时间小于5分钟则每隔10秒钟，睡眠1ms
+				dwLastTick = dwCurTick;
+				Sleep(1);
+				iSleepTimes++;
+				std::cout << dwCurTick <<"Too long time!\n";
+			}else {//该函数的执行时间超过了5分钟，可能存在ssl异常问题，此时必须抛出异常并返回警告
+				delete[] buff;
+				buff = NULL;
+				return false;
+			}
+		}
+		res = SSL_read(ssl, buff+ offset, buff_len- offset);
+
+		int ssl_err = SSL_get_error(ssl, res);
+
+		if (ssl_err == SSL_ERROR_NONE)
+		{
+			if (offset + res > buff_len - 1)
+			{
+				delete[] buff;
+				buff = NULL;
+				throw ECImap(ECImap::LACK_OF_MEMORY);
+			}
+			buff[offset+ res] = '\0';
+			if (NULL != ( pchTT = strstr(buff + offset, "A.21"))) {
+				//搜索新收到的数据是否含有结束符
+				bFinish = true;
+			}
+
+			switch (ssl_err){
+			case SSL_RECEIVED_SHUTDOWN:
+				//接收文件异常，退出下载过程
+				break;
+			default:
+				break;
+			}
+			offset += res;
+
+		}
+	}
+
+	unsigned char *pucBuffer = new unsigned char[offset];
+	if (NULL != pucBuffer)
+	{
+		int iPlus;
+		char * pcPlus = strchr(buff, '\n');
+		pcPlus += 1;
+		iPlus = pcPlus - buff;
+
+		int iFileLen = base64_decode_attach((unsigned char *)pcPlus,offset- iPlus, pucBuffer);
+		if (iFileLen > 0)
+		{//如果返回的是解码出的文件的大小，则将缓冲区内容写入文件
+			std::ofstream fileAttach;
+			fileAttach.open(szDestFilePath, std::ios::out | std::ios::binary | std::ios::trunc);
+			if (fileAttach.is_open())
+			{
+				fileAttach.write((const char *)pucBuffer, iFileLen);
+				fileAttach.close();
+			}
+		}
+		delete[] pucBuffer;
+	}
+
+	delete[] buff;
+	buff = NULL;
 	return true;
 }
 /************************************************************************/
@@ -2065,11 +1809,34 @@ void CImap::ReceiveAttachment(Imap_Command_Entry* pEntry, const char *szDestFile
 	//在line变量里面存储着该附件的全部base64编码
 	//接下来必须进行转码，并将转码信息存入文件中
 	//注意解码后的值可能会包含\0这样的值，所以必须特别处理
-
-	strcpy_s(RecvBuf, BUFFER_SIZE, line.c_str());
+	size_t iBegin, iEnd;
+	iBegin = line.find('\n', 0);
+	iEnd = line.rfind('=', line.npos);
+	line = line.substr(iBegin + 1, iEnd - iBegin);
+	size_t pos = 0;
+	while ((pos = line.find("\r\n", pos)) != line.npos)
+	{
+		line.erase(pos, 2);
+	}
+	//去掉line中的无效信息后进行解码
+	unsigned char *pucBuffer = new unsigned char[line.length()];
+	if (NULL != pucBuffer)
+	{
+		int iFileLen = base64_decode_attachment(line, pucBuffer);
+		if (iFileLen > 0)
+		{//如果返回的是解码出的文件的大小，则将缓冲区内容写入文件
+			std::ofstream fileAttach;
+			fileAttach.open(szDestFilePath, std::ios::out | std::ios::binary | std::ios::trunc);
+			if (fileAttach.is_open())
+			{
+				fileAttach.write((const char *)pucBuffer, iFileLen);
+				fileAttach.close();
+			}
+		}
+		delete[] pucBuffer;
+	}
+		
 	line.clear();
-
-
 }
 /************************************************************************/
 /*                                                                      */
