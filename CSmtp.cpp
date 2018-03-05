@@ -4,7 +4,7 @@
 
 //#define _CRTDBG_MAP_ALLOC
 #include <stdlib.h>
-#include <crtdbg.h>
+//#include <crtdbg.h>
 
 #include "CSmtp.h"
 
@@ -2112,8 +2112,8 @@ void CSmtp::SendData(Command_Entry* pEntry)
 		}
 	}
 
-	std::cout << "SendData#####################################\n";
-	std::cout << SendBuf;
+// 	std::cout << "SendData#####################################\n";
+// 	std::cout << SendBuf;
 
 	FD_CLR(hSocket,&fdwrite);
 }
@@ -2866,8 +2866,8 @@ void CSmtp::ReceiveResponse(Command_Entry* pEntry)
 		size_t begin = 0;
 		size_t offset = 0;
 
-		std::cout << "ReceiveResponse@@@@@@@@@@@@@@@@@@@@@@@@@\n";
-		std::cout << RecvBuf;
+// 		std::cout << "ReceiveResponse@@@@@@@@@@@@@@@@@@@@@@@@@\n";
+// 		std::cout << RecvBuf;
 
 		if(pEntry->command == command_INIT)
 		{
@@ -3009,8 +3009,8 @@ void CSmtp::SendData_SSL(SSL* ssl, Command_Entry* pEntry)
 		}
 	}
 
-	std::cout << "SendData_SSL $$$$$$$$$$$$$$$$$$$$$$$$$$$\n";
-	std::cout << SendBuf;
+// 	std::cout << "SendData_SSL $$$$$$$$$$$$$$$$$$$$$$$$$$$\n";
+// 	std::cout << SendBuf;
 	FD_ZERO(&fdwrite);
 	FD_ZERO(&fdread);
 }

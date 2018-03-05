@@ -2,9 +2,9 @@
 // IMAP Class
 ////////////////////////////////////////////////////////////////////////////////
 
-#define _CRTDBG_MAP_ALLOC
+//#define _CRTDBG_MAP_ALLOC
 #include <stdlib.h>
-#include <crtdbg.h>
+//#include <crtdbg.h>
 
 #include "CImap.h"
 
@@ -1072,7 +1072,7 @@ void CImap::ReceiveData(Imap_Command_Entry* pEntry)
 	{
 		throw ECImap(ECImap::CONNECTION_CLOSED);
 	}
-	std::cout << RecvBuf << "ReceiveData: ♀♀♀♀♀♀♀♀♀♀♀♀♀♀♀♀♀♀♀♀\n";
+//	std::cout << RecvBuf << "ReceiveData: ♀♀♀♀♀♀♀♀♀♀♀♀♀♀♀♀♀♀♀♀\n";
 
 }
 
@@ -1141,7 +1141,7 @@ void CImap::SendData(Imap_Command_Entry* pEntry)
 		}
 	}
 
-	std::cout << SendBuf << "SendData: ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑\n";
+//	std::cout << SendBuf << "SendData: ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑\n";
 
 	FD_CLR(hSocket, &fdwrite);
 }
@@ -1671,7 +1671,7 @@ bool CImap::ReceiveAttachment_SSL(const char *szDestFilePath)
 				dwLastTick = dwCurTick;
 				Sleep(1);
 				iSleepTimes++;
-				std::cout << dwCurTick <<"Too long time!\n";
+//				std::cout << dwCurTick <<"Too long time!\n";
 			}else {//该函数的执行时间超过了5分钟，可能存在ssl异常问题，此时必须抛出异常并返回警告
 				delete[] buff;
 				buff = NULL;
@@ -1681,30 +1681,29 @@ bool CImap::ReceiveAttachment_SSL(const char *szDestFilePath)
 		res = SSL_read(ssl, buff+ offset, buff_len- offset);
 
 		int ssl_err = SSL_get_error(ssl, res);
-
-		if (ssl_err == SSL_ERROR_NONE)
-		{
+		switch (ssl_err) {
+		case SSL_ERROR_NONE:
 			if (offset + res > buff_len - 1)
 			{
 				delete[] buff;
 				buff = NULL;
 				throw ECImap(ECImap::LACK_OF_MEMORY);
 			}
-			buff[offset+ res] = '\0';
-			if (NULL != ( pchTT = strstr(buff + offset, "A.21"))) {
+			buff[offset + res] = '\0';
+			if (NULL != (pchTT = strstr(buff + offset, "A.21"))) {
 				//搜索新收到的数据是否含有结束符
 				bFinish = true;
 			}
-
-			switch (ssl_err){
-			case SSL_RECEIVED_SHUTDOWN:
-				//接收文件异常，退出下载过程
-				break;
-			default:
-				break;
-			}
 			offset += res;
-
+			break;
+		case SSL_ERROR_ZERO_RETURN:
+			//接收文件异常，退出下载过程
+			//或者连接中断的时候，必须已经异常退出过程。
+			delete[] buff;
+			buff = NULL;
+			return false;
+		default:
+			break;
 		}
 	}
 
@@ -2006,7 +2005,7 @@ void CImap::ReceiveData_SSL(SSL* ssl, Imap_Command_Entry* pEntry)
 	{
 		throw ECImap(ECImap::CONNECTION_CLOSED);
 	}
-	std::cout << RecvBuf << "ReceiveData_SSL: ♂♂♂♂♂♂♂♂♂♂♂♂♂♂♂♂♂\n";
+//	std::cout << RecvBuf << "ReceiveData_SSL: ♂♂♂♂♂♂♂♂♂♂♂♂♂♂♂♂♂\n";
 
 }
 
@@ -2166,7 +2165,7 @@ void CImap::SendData_SSL(SSL* ssl, Imap_Command_Entry* pEntry)
 		}
 	}
 
-	std::cout << SendBuf << "SendData_SSL:∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧\n";
+//	std::cout << SendBuf << "SendData_SSL:∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧∧\n";
 
 	FD_ZERO(&fdwrite);
 	FD_ZERO(&fdread);
